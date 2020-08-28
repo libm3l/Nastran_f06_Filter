@@ -1,24 +1,4 @@
 !
-!
-!
-!      Copyright (C) 2014  Adam Jirasek
-!  
-!      This program is free software: you can redistribute it and/or modify
-!      it under the terms of the GNU Lesser General Public License as published by
-! *    the Free Software Foundation, either version 3 of the License, or
-!      (at your option) any later version.
-!  
-!      This program is distributed in the hope that it will be useful,
-!      but WITHOUT ANY WARRANTY; without even the implied warranty of
-!      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!      GNU Lesser General Public License for more details.
-!  
-!      You should have received a copy of the GNU Lesser General Public License
-!      along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!      
-!      contact: libm3l@gmail.com
-!  
-! 
 !  this is a very simple code which loops over f06 file and \
 !  1. extracts grid points by looking at keyword grid
 !  2. loops over modes and extract them, each mode to a separate file
@@ -48,6 +28,7 @@ character*80 :: text_line
 character :: type
 
 type char
+!   character*80 :: text
    integer :: point_id
    real :: x,y,z
    real :: T1,T2,T3
@@ -66,16 +47,13 @@ type(line_char), allocatable :: line_per_mode(:)
 
 
 real :: x,y,z
-integer :: i,n, istat, modeline, j, imode, iline, jline
+integer :: i,n, istat, modeline, j, imode, iline, jline, kline, ierr
 character*3 :: str
 
 
-!name = 'nsvibe_cfg24611_10lb.f06'
-
 write(*,*)' Name of f06 file '
 read(*,*)name
-write(*,*)' Number of modes '
-read(*,*)imode
+
 !
 !  get number of lines in the file and allocate
 !  memory for each line
@@ -101,7 +79,9 @@ open(15,file=name)
 open(16,file='GRID')
  iline = 1
  jline = 1
-do i = 1, n
+ kline = 0
+ imode = 0
+do i = 1, n - kline
 !   line(i)%text = ' '
 !   line(i)%type = ' '
    read(15,'(a80)',end = 1000)text_line
@@ -122,8 +102,20 @@ do i = 1, n
         write(16,*)lineC(iline)%x,lineC(iline)%y,lineC(iline)%z
         modeline = iline
         iline = iline + 1
-
-   else
+!
+!  find number of modes
+!
+    else if(text_line(5:19) == 'NO.       ORDER')then
+          do 
+            read(15,'(a80)',end = 1000)text_line
+            kline = kline + 1
+            read(text_line(8:16),*, IOSTAT=ierr)imode
+            if(ierr /= 0)then
+              write(*,*)'Number of modes is ',imode
+              exit
+            end if
+          end do
+    else
 
         read(text_line(21:22),*, err=101, end = 101)type
         if(type == 'G')then
@@ -140,9 +132,11 @@ do i = 1, n
 	  read(text_line(42:55),*, err=101)lineE(jline)%t2
 	  read(text_line(57:70),*, err=101)lineE(jline)%t3 
           jline = jline + 1
-        end if
 
-101	continue
+    end if
+
+
+101 continue
 
    end if
 end do
@@ -165,6 +159,7 @@ write(*,*)' number of grid points is ', modeline
 !  set number of modes for allocation purposes to 31
 !  at the moment we do not know how many modes is in the file
 !
+
 
 allocate(line_per_mode(imode), stat = istat)
 if(istat /= 0)then
@@ -199,6 +194,8 @@ do i=1,modeline
 !
 !  point ID, x,y,z coordinates, displacements
 !
+!              write(9,*)line(j)%point_id, line(i)%x,line(i)%y,line(i)%z,line(j)%t1,line(j)%t2,line(j)%t3
+
               line_per_mode(imode)%line(iline)%point_id = lineE(j)%point_id
               line_per_mode(imode)%line(iline)%x = lineC(i)%x
               line_per_mode(imode)%line(iline)%y = lineC(i)%y
@@ -220,9 +217,6 @@ end do
 
 imode = imode -1 
 
-write(*,*)' Number of modes is ', imode
-write(*,*)' Number of lines is ', iline
-
 do i=1,imode
   write(str, '(i3.3)')i
   name = 'Mode_'//str//'.dat'
@@ -230,10 +224,11 @@ do i=1,imode
   open(15, file = trim(name))
 
   do j=1,modeline
+
 !
 !  save data
 !  3 grid coordinates, 3 eigenmodes, and three coordinates of deformed grid
-!  x,y,z , t1,t2,t3, x+t1, y+t2, z+t3
+!  x,y,z , t1,,t2,t3
 !
     write(15,*)line_per_mode(i)%line(j)%x,line_per_mode(i)%line(j)%y,line_per_mode(i)%line(j)%z,line_per_mode(i)%line(j)%t1,&
          line_per_mode(i)%line(j)%t2,line_per_mode(i)%line(j)%t3, line_per_mode(i)%line(j)%x + line_per_mode(i)%line(j)%t1, &
