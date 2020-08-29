@@ -5,5 +5,5 @@ To compile do something like
 
 gfortran -o Nastran_f06_Filter.out Nastran_f06_Filter.f90 
 
-Input is the name of file and number of modes
+Input is the name of the nastran file
 
